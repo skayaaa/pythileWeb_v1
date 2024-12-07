@@ -64,6 +64,9 @@ async def update_animal(request, animal_id):
     animal.species = data.get("species", animal.species)
     animal.age = data.get("age", animal.age)
     await animal.save()
+    cache = caches.get("default")
+    await cache.delete("animals_list")
+    
 
     return json({"message": "Animal updated successfully", "animal": {
         "id": animal.id, "name": animal.name, "species": animal.species, "age": animal.age,
