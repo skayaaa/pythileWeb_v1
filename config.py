@@ -11,3 +11,7 @@ DB_NAME = "pythile_db"
 
 SECRET_KEY = "supersecretkey"
 DATABASE_URL = "postgres://postgres:1921@localhost:5432/pythile_db"
+
+
+REDIS_HOST = "localhost"
+REDIS_POST = "6379"

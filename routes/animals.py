@@ -2,16 +2,25 @@ from sanic import Blueprint
 from models.animals import Animal
 from models.shelters import Shelter
 from sanic.response import json
+from aiocache import cached , caches
 
 animals_bp = Blueprint("animals", url_prefix="/animals")
+@cached(ttl=60, key = "animal_list")
+async def get_animals_list():
+    animals = await Animal.all().values("id","name","species","age","shelter_id")
+    return animals
+    
 
 @animals_bp.route("/add", methods=["POST"])
 async def add_animal(request):
     data = request.json
+    if not data:
+        return json({"error": "Request body must be JSON"}, status = 400)
     name = data.get("name")
     species = data.get("species")
     age = data.get("age")
     shelter_id = data.get("shelter_id")
+    
 
     if not name or not species or not age or not shelter_id:
         return json({"error": "Name, species, age, and shelter_id are required"}, status=400)
@@ -21,6 +30,10 @@ async def add_animal(request):
         return json({"error": "Shelter not found"}, status=404)
 
     animal = await Animal.create(name=name, species=species, age=age, shelter=shelter)
+    
+    cache = caches.get("default")
+    await cache.delete("animals_list")
+    
     return json({"message": "Animal added successfully", "animal": {
         "id": animal.id, "name": animal.name, "species": animal.species, "age": animal.age,
         "shelter_id": animal.shelter_id
@@ -28,7 +41,7 @@ async def add_animal(request):
 
 @animals_bp.route("/", methods=["GET"])
 async def list_animals(request):
-    animals = await Animal.all().values("id", "name", "species", "age", "shelter_id")
+    animals = await get_animals_list()
     return json({"animals": animals}, status=200)
 
 @animals_bp.route("/<animal_id:int>", methods=["GET"])
@@ -65,4 +78,7 @@ async def delete_animal(request, animal_id):
         return json({"error": "Animal not found"}, status=404)
 
     await animal.delete()
+    
+    cache = caches.get("default")
+    await cache.delete("animals_list")
     return json({"message": "Animal deleted successfully"}, status=200)
