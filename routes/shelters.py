@@ -2,6 +2,7 @@ from sanic import Blueprint, response
 from models.shelters import Shelter
 from sanic.response import json
 from aiocache import cached , caches
+from utils.auth_utils import decode_token
 
 shelters_bp = Blueprint("shelters", url_prefix="/shelters")
 @cached(ttl=60, key = "shelter_list")
@@ -11,6 +12,16 @@ async def get_shelters_list():
 
 @shelters_bp.route("/add", methods=["POST"])
 async def add_shelter(request):
+    
+    token = request.headers.get("Authorization", "").replace("Bearer ", "")
+    if not token:
+        return json({"error" : "Authorization header is missing"}, status = 401)
+    decoded = decode_token(token)
+    if "error" in decoded:
+        return json(decoded, status = 401)
+    if decoded.get("role") != "admin":
+        return json({"error" : "Access denied"}, status = 401)
+    
     data = request.json
     if not data:
         return json({"error" : "Request must be JSON"}, status = 400)
@@ -44,6 +55,15 @@ async def get_shelter(request, shelter_id):
 
 @shelters_bp.route("/update/<shelter_id:int>", methods=["PUT"])
 async def update_shelter(request, shelter_id):
+    token = request.headers.get("Authorization", "").replace("Bearer ", "")
+    if not token:
+        return json({"error" : "Authorization header is missing"}, status=401)
+    decoded = decode_token(token)
+    if "error" in decoded:
+        return json(decoded, status = 401)
+    if decoded.get("role") != "admin":
+        return json({"error" :"Access denied"}, status=403)
+    
     data = request.json
     shelter = await Shelter.get_or_none(id=shelter_id)
 
@@ -62,6 +82,16 @@ async def update_shelter(request, shelter_id):
 
 @shelters_bp.route("/delete/<shelter_id:int>", methods=["DELETE"])
 async def delete_shelter(request, shelter_id):
+    token = request.headers.get("Authorization", "").replace("Bearer ", "")
+    if not token:
+        return json({"error" : "Authorization header is missing"}, status = 401)
+    
+    decoded = decode_token(token)
+    if  "error" in decoded:
+        return json(decoded, status = 401)
+    
+    if decoded.get("role") != "admin":
+        return json("Access denied", status = 403)
     shelter = await Shelter.get_or_none(id=shelter_id)
 
     if not shelter:

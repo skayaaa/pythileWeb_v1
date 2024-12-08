@@ -3,6 +3,7 @@ from models.animals import Animal
 from models.shelters import Shelter
 from sanic.response import json
 from aiocache import cached , caches
+from utils.auth_utils import decode_token
 
 animals_bp = Blueprint("animals", url_prefix="/animals")
 @cached(ttl=60, key = "animal_list")
@@ -13,6 +14,18 @@ async def get_animals_list():
 
 @animals_bp.route("/add", methods=["POST"])
 async def add_animal(request):
+    
+    token = request.headers.get("Authorization", "").replace("Bearer ", "")
+    if not token:
+        return json({"error" :"Authorization header is missing"}, status = 401)
+    
+    decoded = decode_token(token)
+    if "error" in decoded:
+        return json(decoded, status = 401)
+    
+    if decoded.get("role") != "admin":
+        return json({"error" : "Access denied"}, status = 403)
+    
     data = request.json
     if not data:
         return json({"error": "Request body must be JSON"}, status = 400)
@@ -54,6 +67,15 @@ async def get_animal(request, animal_id):
 
 @animals_bp.route("/update/<animal_id:int>", methods=["PUT"])
 async def update_animal(request, animal_id):
+    token = request.headers.get("Authorization", "").replace("Bearer ", "")
+    if not token:
+        return json({"error" : "Aurhorization header is missing"}, status = 401)
+    
+    decoded = decode_token(token)
+    if "error" in token:
+        return json(decoded, status=401)
+    if decoded.get("role") != "admim":
+        return json({"error" : "Access denied"}, status = 403)
     data = request.json
     animal = await Animal.get_or_none(id=animal_id)
 
@@ -76,6 +98,14 @@ async def update_animal(request, animal_id):
 @animals_bp.route("/delete/<animal_id:int>", methods=["DELETE"])
 async def delete_animal(request, animal_id):
     animal = await Animal.get_or_none(id=animal_id)
+    token = request.headers.get("Authorization", "").replace("Bearer ", "")
+    if not token:
+        return json({"error" : "Authorization header is missing"}, status = 401)
+    decoded = decode_token(token)
+    if "error" in decoded:
+        return json(decoded , status = 401)
+    if decoded.get("role") != "admin":
+        return json({"error" : "Animal not found"}, status = 404)
 
     if not animal:
         return json({"error": "Animal not found"}, status=404)
